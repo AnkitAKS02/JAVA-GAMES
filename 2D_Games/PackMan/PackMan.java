@@ -6,7 +6,7 @@ import java.util.HashSet;
 import java.util.Random;
 import javax.swing.*;
 
-public class PackMan extends JPanel{
+public class PackMan extends JPanel implements ActionListener,KeyListener{
 
     class Block {
         int x;
@@ -31,45 +31,45 @@ public class PackMan extends JPanel{
             this.startY = y;
         }
 
-        // void updateDirection(char direction) {
-        //     char prevDirection = this.direction;
-        //     this.direction = direction;
-        //     updateVelocity();
-        //     this.x += this.velocityX;
-        //     this.y += this.velocityY;
-        //     for (Block wall : walls) {
-        //         if (collision(this, wall)) {
-        //             this.x -= this.velocityX;
-        //             this.y -= this.velocityY;
-        //             this.direction = prevDirection;
-        //             updateVelocity();
-        //         }
-        //     }
-        // }
+        void updateDirection(char direction) {
+            char prevDirection = this.direction;
+            this.direction = direction;
+            updateVelocity();
+            this.x += this.velocityX;
+            this.y += this.velocityY;
+            for (Block wall : walls) {
+                if (collision(this, wall)) {
+                    this.x -= this.velocityX;
+                    this.y -= this.velocityY;
+                    this.direction = prevDirection;
+                    updateVelocity();
+                }
+            }
+        }
 
-        // void updateVelocity() {
-        //     if (this.direction == 'U') {
-        //         this.velocityX = 0;
-        //         this.velocityY = -tileSize/4;
-        //     }
-        //     else if (this.direction == 'D') {
-        //         this.velocityX = 0;
-        //         this.velocityY = tileSize/4;
-        //     }
-        //     else if (this.direction == 'L') {
-        //         this.velocityX = -tileSize/4;
-        //         this.velocityY = 0;
-        //     }
-        //     else if (this.direction == 'R') {
-        //         this.velocityX = tileSize/4;
-        //         this.velocityY = 0;
-        //     }
-        // }
+        void updateVelocity() {
+            if (this.direction == 'U') {
+                this.velocityX = 0;
+                this.velocityY = -cellSize/4;
+            }
+            else if (this.direction == 'D') {
+                this.velocityX = 0;
+                this.velocityY = cellSize/4;
+            }
+            else if (this.direction == 'L') {
+                this.velocityX = -cellSize/4;
+                this.velocityY = 0;
+            }
+            else if (this.direction == 'R') {
+                this.velocityX = cellSize/4;
+                this.velocityY = 0;
+            }
+        }
 
-        // void reset() {
-        //     this.x = this.startX;
-        //     this.y = this.startY;
-        // }
+        void reset() {
+            this.x = this.startX;
+            this.y = this.startY;
+        }
     }
 
     private int rowCount = 21;
@@ -117,14 +117,21 @@ public class PackMan extends JPanel{
     HashSet<Block> foods;
     HashSet<Block> ghosts;
     Block packman;
-
+    Timer gameLoop;
+    char[] directions = {'U','D','L','R'};
+    Random random = new Random();
+    int score = 0;
+    int lives = 4;
+    boolean gameOver = false;
 
 
     PackMan(){
         setPreferredSize(new Dimension(boardWidth,boardHeight));
-        setBackground(Color.black);
+        setBackground(Color.BLACK);
+        addKeyListener(this);
+        setFocusable(true);
 
-                //load images
+        //load images
         wallImage = new ImageIcon(getClass().getResource("./wall.png")).getImage();
         blueGhostImage = new ImageIcon(getClass().getResource("./blueGhost.png")).getImage();
         orangeGhostImage = new ImageIcon(getClass().getResource("./orangeGhost.png")).getImage();
@@ -137,6 +144,12 @@ public class PackMan extends JPanel{
         packmanRightImage = new ImageIcon(getClass().getResource("./pacmanRight.png")).getImage();
 
         loadMap();
+        for(Block ghost: ghosts){
+            ghost.updateDirection(directions[random.nextInt(4)]);
+
+        }
+        gameLoop = new Timer(50,this);
+        gameLoop.start();
         System.out.println("Map Loaded");
     }
 
@@ -185,5 +198,161 @@ public class PackMan extends JPanel{
 
     public void draw(Graphics g){
         g.drawImage(packman.image, packman.x, packman.y, packman.width, packman.height, null);
+
+        // Draw walls
+        for(Block wall : walls){
+            g.drawImage(wall.image, wall.x, wall.y, wall.width, wall.height, null);
+        }
+
+        // Draw foods
+        g.setColor(Color.YELLOW);
+        for(Block food : foods){
+            g.fillOval(food.x, food.y, food.width, food.height);
+        }
+
+        // Draw ghosts
+        for(Block ghost : ghosts){
+            g.drawImage(ghost.image, ghost.x, ghost.y, ghost.width, ghost.height, null);
+        }
+
+        //score
+        g.setColor(Color.WHITE);
+        g.setFont(new Font("Arial", Font.PLAIN, 18));
+        if (gameOver) {
+            g.drawString("Game Over: " + String.valueOf(score), cellSize/2, cellSize/2);
+        }
+        else {
+            g.drawString("x" + String.valueOf(lives) + " Score: " + String.valueOf(score), cellSize/2, cellSize/2);
+        }
+
+        //draw game over message:
+        if (gameOver) {
+        g.drawString("Game Over: " + score, cellSize/2, cellSize/2);
+        g.drawString("Press any key to play again", cellSize/2, cellSize);
+        } else {
+            g.drawString("x" + lives + " Score: " + score, cellSize/2, cellSize/2);
+        }
+
+    }
+
+    public void move() {
+        packman.x += packman.velocityX;
+        packman.y += packman.velocityY;
+        if (packman.x < 0) {
+            packman.x = boardWidth - packman.width;
+        } else if (packman.x + packman.width > boardWidth) {
+            packman.x = 0;
+        }
+        //check wall collisions
+        for (Block wall : walls) {
+            if (collision(packman, wall)) {
+                packman.x -= packman.velocityX;
+                packman.y -= packman.velocityY;
+                break;
+            }
+        }
+
+        //check ghost collisions
+        for (Block ghost : ghosts) {
+            if (collision(ghost, packman)) {
+                lives -= 1;
+                if (lives == 0) {
+                    gameOver = true;
+                    return;
+                }
+                resetPositions();
+            }
+
+            if (ghost.y == cellSize*9 && ghost.direction != 'U' && ghost.direction != 'D') {
+                ghost.updateDirection('U');
+            }
+            ghost.x += ghost.velocityX;
+            ghost.y += ghost.velocityY;
+            for (Block wall : walls) {
+                if (collision(ghost, wall) || ghost.x <= 0 || ghost.x + ghost.width >= boardWidth) {
+                    ghost.x -= ghost.velocityX;
+                    ghost.y -= ghost.velocityY;
+                    char newDirection = directions[random.nextInt(4)];
+                    ghost.updateDirection(newDirection);
+                }
+            }
+        }
+
+        //check food collision
+        Block foodEaten = null;
+        for (Block food : foods) {
+            if (collision(packman, food)) {
+                foodEaten = food;
+                score += 10;
+            }
+        }
+        foods.remove(foodEaten);
+
+        if (foods.isEmpty()) {
+            loadMap();
+            resetPositions();
+        }
+    }
+
+        public boolean collision(Block a, Block b) {
+            return  a.x < b.x + b.width &&
+                    a.x + a.width > b.x &&
+                    a.y < b.y + b.height &&
+                    a.y + a.height > b.y;
+        }
+
+    public void resetPositions() {
+        packman.reset();
+        packman.velocityX = 0;
+        packman.velocityY = 0;
+        for (Block ghost : ghosts) {
+            ghost.reset();
+            char newDirection = directions[random.nextInt(4)];
+            ghost.updateDirection(newDirection);
+        }
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e){
+        move();
+        repaint();
+        if (gameOver) {
+            gameLoop.stop();
+            System.out.println("Game Over,Your Total Score is: " + score);
+        }
+    }
+
+    @Override
+    public void keyTyped(KeyEvent e) {
+        // System.out.println("left")
+    }
+
+    @Override
+    public void keyPressed(KeyEvent e) {}
+
+    @Override
+    public void keyReleased(KeyEvent e) {
+        if (gameOver) {
+            loadMap();
+            resetPositions();
+            lives = 3;
+            score = 0;
+            gameOver = false;
+            gameLoop.start();
+        }
+        int key = e.getKeyCode();
+        if(key == KeyEvent.VK_UP){
+            packman.updateDirection('U');
+            packman.image = packmanUpImage;
+        }  else if (key == KeyEvent.VK_DOWN) {
+            packman.updateDirection('D');
+            packman.image = packmanDownImage;
+        } else if (key == KeyEvent.VK_LEFT) {
+            packman.updateDirection('L');
+            packman.image = packmanLeftImage;
+        } else if (key == KeyEvent.VK_RIGHT) {
+            packman.updateDirection('R');
+            packman.image = packmanRightImage;
+        }
     }
 }
